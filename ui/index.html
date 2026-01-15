@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Loop - Speech AI Assistant</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      animation: fadeInDown 0.6s ease;
+    }
+    
+    .header h1 {
+      font-size: 3em;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .header p {
+      font-size: 1.1em;
+      opacity: 0.9;
+    }
+    
+    /* Workflow Visualization */
+    .workflow {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeIn 0.8s ease;
+    }
+    
+    .workflow h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 1.5em;
+    }
+    
+    .workflow-steps {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    .workflow-step {
+      flex: 1;
+      min-width: 150px;
+      text-align: center;
+      position: relative;
+    }
+    
+    .workflow-icon {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 15px;
+      font-size: 2em;
+      transition: all 0.3s ease;
+    }
+    
+    .workflow-step:hover .workflow-icon {
+      transform: scale(1.1);
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .workflow-step.active .workflow-icon {
+      background: #4CAF50;
+      box-shadow: 0 0 20px rgba(76, 175, 80, 0.6);
+      animation: pulse 1.5s infinite;
+    }
+    
+    .workflow-label {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .workflow-desc {
+      font-size: 0.85em;
+      opacity: 0.8;
+    }
+    
+    .workflow-arrow {
+      font-size: 2em;
+      opacity: 0.6;
+      align-self: center;
+    }
+    
+    /* Control Panel */
+    .control-panel {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeIn 1s ease;
+    }
+    
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    label {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 0.95em;
+    }
+    
+    input, select, textarea {
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      font-size: 1em;
+      transition: all 0.3s ease;
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+      background: #fff;
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .btn {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 1.1em;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      width: 100%;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    }
+    
+    .btn-warning {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .btn:disabled {
+      background: rgba(255, 255, 255, 0.2);
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn-group .btn {
+      flex: 1;
+    }
+    
+    /* Results Section */
+    .results {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeIn 1.2s ease;
+    }
+    
+    .result-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .result-card h3 {
+      margin-bottom: 15px;
+      font-size: 1.2em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .result-content {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 15px;
+      border-radius: 8px;
+      line-height: 1.6;
+      font-size: 1.05em;
+      min-height: 50px;
+    }
+    
+    .result-content.editable {
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      border: 2px solid #4CAF50;
+    }
+    
+    /* Metrics */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    
+    .metric-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .metric-value {
+      font-size: 2.5em;
+      font-weight: 700;
+      margin: 10px 0;
+      color: #4CAF50;
+    }
+    
+    .metric-label {
+      font-size: 0.9em;
+      opacity: 0.9;
+      margin-bottom: 5px;
+    }
+    
+    .metric-desc {
+      font-size: 0.8em;
+      opacity: 0.7;
+      margin-top: 5px;
+    }
+    
+    /* Status Badge */
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+    
+    .status-idle { background: rgba(255, 255, 255, 0.2); }
+    .status-running { background: #ff9800; animation: pulse 1s infinite; }
+    .status-success { background: #4CAF50; }
+    .status-error { background: #f44336; }
+    
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    @keyframes recording-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7); }
+      50% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); }
+    }
+    
+    .recording .workflow-icon {
+      animation: recording-pulse 1.5s infinite;
+    }
+    
+    /* Engine Info */
+    .engine-info {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    
+    .engine-badge {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .engine-badge.active {
+      background: #4CAF50;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 2em; }
+      .workflow-steps { flex-direction: column; }
+      .workflow-arrow { transform: rotate(90deg); margin: 10px 0; }
+      .control-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .btn-group { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎙️ Voice Loop</h1>
+      <p>Local Speech AI Assistant - STT → LLM → TTS Pipeline</p>
+    </div>
+
+    <!-- Workflow Visualization -->
+    <div class="workflow">
+      <h2>📊 Process Workflow</h2>
+      <div class="workflow-steps">
+        <div class="workflow-step" id="step-record">
+          <div class="workflow-icon">🎤</div>
+          <div class="workflow-label">1. Record</div>
+          <div class="workflow-desc">Capture audio from microphone</div>
+        </div>
+        <div class="workflow-arrow">→</div>
+        <div class="workflow-step" id="step-stt">
+          <div class="workflow-icon">📝</div>
+          <div class="workflow-label">2. Speech-to-Text</div>
+          <div class="workflow-desc">Transcribe with Whisper</div>
+        </div>
+        <div class="workflow-arrow">→</div>
+        <div class="workflow-step" id="step-llm">
+          <div class="workflow-icon">🧠</div>
+          <div class="workflow-label">3. LLM</div>
+          <div class="workflow-desc">Process with Ollama</div>
+        </div>
+        <div class="workflow-arrow">→</div>
+        <div class="workflow-step" id="step-tts">
+          <div class="workflow-icon">🔊</div>
+          <div class="workflow-label">4. Text-to-Speech</div>
+          <div class="workflow-desc">Speak the response</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      <h2>⚙️ Configuration</h2>
+      <div class="control-grid">
+        <div class="control-group">
+          <label for="seconds">🎤 Recording Duration (seconds)</label>
+          <input id="seconds" type="number" min="1" max="10" value="3" />
+        </div>
+        <div class="control-group">
+          <label for="stt">📝 STT Model (Whisper)</label>
+          <select id="stt">
+            <option value="tiny">Tiny (fastest, less accurate)</option>
+            <option value="base">Base (fast)</option>
+            <option value="small" selected>Small (balanced)</option>
+            <option value="medium">Medium (slower, more accurate)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="llm">🧠 LLM Model (Ollama)</label>
+          <input id="llm" value="phi" placeholder="e.g., phi, phi3, mistral" />
+        </div>
+        <div class="control-group">
+          <label for="tts">🔊 TTS Engine</label>
+          <select id="tts">
+            <option value="pyttsx3">Windows SAPI (pyttsx3)</option>
+            <option value="piper">Piper TTS (Neural)</option>
+            <option value="coqui">Coqui TTS (Neural)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="rate">⚡ Speech Rate (1.0 = normal)</label>
+          <input id="rate" type="number" step="0.1" min="0.5" max="1.5" value="1.0" />
+        </div>
+      </div>
+      <div class="control-group">
+        <label for="prompt">💬 System Prompt</label>
+        <textarea id="prompt" rows="2" placeholder="Instructions for the LLM...">Answer briefly.</textarea>
+      </div>
+      
+      <!-- Step 1: Recording -->
+      <div id="step1Controls">
+        <div class="btn-group">
+          <button id="startRecordBtn" class="btn btn-primary">
+            🎤 Start Recording
+          </button>
+          <button id="stopRecordBtn" class="btn btn-danger hidden">
+            ⏹️ Stop Recording
+          </button>
+        </div>
+      </div>
+      
+      <!-- Step 2: Transcript Review -->
+      <div id="step2Controls" class="hidden" style="margin-top: 15px;">
+        <div class="btn-group">
+          <button id="confirmTranscriptBtn" class="btn btn-secondary">
+            ✓ Send to AI
+          </button>
+          <button id="retryRecordBtn" class="btn btn-warning">
+            🔄 Re-record
+          </button>
+        </div>
+      </div>
+      
+      <!-- Step 3: TTS Control -->
+      <div id="step3Controls" class="hidden" style="margin-top: 15px;">
+        <button id="stopTTSBtn" class="btn btn-danger">
+          ⏹️ Stop Speaking
+        </button>
+      </div>
+      
+      <div id="statusBadge" style="text-align: center; margin-top: 15px;">
+        <span class="status-badge status-idle">Ready to Record</span>
+      </div>
+      <div id="errorDisplay" style="display: none; background: rgba(244, 67, 54, 0.2); border: 1px solid #f44336; border-radius: 8px; padding: 12px; margin-top: 15px; color: #fff;">
+        <strong>Error:</strong> <span id="errorMessage"></span>
+      </div>
+    </div>
+
+    <!-- Engine Info -->
+    <div class="engine-info" id="engineInfo" style="display: none;">
+      <div class="engine-badge" id="sttInfo">
+        <span>📝 STT:</span>
+        <span id="sttEngine">-</span>
+      </div>
+      <div class="engine-badge" id="llmInfo">
+        <span>🧠 LLM:</span>
+        <span id="llmEngine">-</span>
+      </div>
+      <div class="engine-badge" id="ttsInfo">
+        <span>🔊 TTS:</span>
+        <span id="ttsEngine">-</span>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results">
+      <h2>📋 Results</h2>
+      <div class="result-card">
+        <h3>
+          <span>📝</span>
+          <span>Your Question (Transcript)</span>
+          <span id="transcriptStatus" class="status-badge status-idle" style="margin-left: auto;">Waiting</span>
+        </h3>
+        <div class="result-content" id="transcript" contenteditable="false">
+          Press "Start Recording" to begin...
+        </div>
+      </div>
+      <div class="result-card">
+        <h3>
+          <span>🤖</span>
+          <span>AI Response</span>
+        </h3>
+        <div class="result-content" id="reply">
+          Waiting for your question...
+        </div>
+      </div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="results">
+      <h2>📊 Performance Metrics</h2>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">🎤 Recording Time</div>
+          <div class="metric-value" id="metricRecord">-</div>
+          <div class="metric-desc">Time to capture audio</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">📝 Transcription Time</div>
+          <div class="metric-value" id="metricSTT">-</div>
+          <div class="metric-desc">Speech-to-text processing</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🧠 LLM Response Time</div>
+          <div class="metric-value" id="metricLLM">-</div>
+          <div class="metric-desc">AI thinking time</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">🔊 Speech Synthesis</div>
+          <div class="metric-value" id="metricTTS">-</div>
+          <div class="metric-desc">Text-to-speech generation</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">⏱️ Total Time</div>
+          <div class="metric-value" id="metricTotal">-</div>
+          <div class="metric-desc">End-to-end latency</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const startRecordBtn = document.getElementById('startRecordBtn');
+    const stopRecordBtn = document.getElementById('stopRecordBtn');
+    const confirmTranscriptBtn = document.getElementById('confirmTranscriptBtn');
+    const retryRecordBtn = document.getElementById('retryRecordBtn');
+    const stopTTSBtn = document.getElementById('stopTTSBtn');
+    const statusBadge = document.getElementById('statusBadge');
+    const transcriptEl = document.getElementById('transcript');
+    const transcriptStatus = document.getElementById('transcriptStatus');
+    const replyEl = document.getElementById('reply');
+    const engineInfo = document.getElementById('engineInfo');
+
+    let audioPath = null;
+    let recordStartTime = null;
+    let totalStartTime = null;
+
+    function setStatus(status, text) {
+      const badge = statusBadge.querySelector('.status-badge');
+      badge.className = `status-badge status-${status}`;
+      badge.textContent = text;
+    }
+    
+    function showError(message) {
+      const errorDisplay = document.getElementById('errorDisplay');
+      const errorMessage = document.getElementById('errorMessage');
+      errorMessage.textContent = message;
+      errorDisplay.style.display = 'block';
+      console.error('[UI ERROR]', message);
+    }
+    
+    function hideError() {
+      document.getElementById('errorDisplay').style.display = 'none';
+    }
+
+    function setTranscriptStatus(status, text) {
+      transcriptStatus.className = `status-badge status-${status}`;
+      transcriptStatus.textContent = text;
+    }
+
+    function setStepActive(stepId, active) {
+      const step = document.getElementById(stepId);
+      if (active) {
+        step.classList.add('active');
+      } else {
+        step.classList.remove('active');
+      }
+    }
+
+    function clearAllSteps() {
+      ['step-record', 'step-stt', 'step-llm', 'step-tts'].forEach(id => {
+        setStepActive(id, false);
+      });
+    }
+
+    function formatTime(ms) {
+      if (ms < 1000) return `${ms}ms`;
+      return `${(ms / 1000).toFixed(2)}s`;
+    }
+
+    function showControls(step) {
+      document.getElementById('step1Controls').classList.toggle('hidden', step !== 1);
+      document.getElementById('step2Controls').classList.toggle('hidden', step !== 2);
+      document.getElementById('step3Controls').classList.toggle('hidden', step !== 3);
+    }
+
+    // Step 1: Start Recording
+    async function startRecording() {
+      hideError();  // Clear any previous errors
+      startRecordBtn.disabled = true;
+      stopRecordBtn.classList.remove('hidden');
+      stopRecordBtn.disabled = false;
+      
+      setStatus('running', 'Recording...');
+      setStepActive('step-record', true);
+      document.getElementById('step-record').classList.add('recording');
+      
+      recordStartTime = Date.now();
+      totalStartTime = Date.now();
+      
+      const maxSeconds = Number(document.getElementById('seconds').value || 5);
+      let countdown = maxSeconds;
+      
+      // Show countdown
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          setStatus('running', `Recording... ${countdown}s remaining`);
+        } else {
+          clearInterval(countdownInterval);
+        }
+      }, 1000);
+      
+      try {
+        console.log('[UI] Starting recording for', maxSeconds, 'seconds...');
+        
+        // Store interval ID so we can clear it if user stops early
+        window.recordingCountdown = countdownInterval;
+        
+        // The server will record for the full duration (blocking)
+        // So we wait for it to complete
+        const res = await fetch("http://localhost:7860/record/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seconds: maxSeconds })
+        });
+        
+        // Clear countdown since recording is done
+        clearInterval(countdownInterval);
+        window.recordingCountdown = null;
+        
+        console.log('[UI] Recording response status:', res.status);
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('[UI] Recording failed:', errorText);
+          throw new Error('Recording failed: ' + errorText);
+        }
+        
+        const recordData = await res.json();
+        console.log('[UI] Recording complete:', recordData);
+        
+        // Recording is done, now transcribe
+        audioPath = recordData.audio_path;
+        
+        if (!audioPath) {
+          throw new Error('No audio file path returned from server');
+        }
+        
+        // Now transcribe
+        const recordTime = Date.now() - recordStartTime;
+        document.getElementById('metricRecord').textContent = formatTime(recordTime);
+        
+        setStepActive('step-stt', true);
+        setStatus('running', 'Transcribing...');
+        
+        const stt = document.getElementById('stt').value;
+        console.log('[UI] Transcribing with model:', stt, 'audio path:', audioPath);
+        const transcribeRes = await fetch("http://localhost:7860/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audio_path: audioPath, stt_model: stt })
+        });
+        
+        console.log('[UI] Transcribe response status:', transcribeRes.status);
+        
+        if (!transcribeRes.ok) {
+          const errorText = await transcribeRes.text();
+          console.error('[UI] Transcribe failed:', errorText);
+          throw new Error('Transcription failed: ' + errorText);
+        }
+        const transcribeData = await transcribeRes.json();
+        console.log('[UI] Transcribe data:', transcribeData);
+        
+        // Show transcript
+        const transcript = transcribeData.transcript || '(no speech detected)';
+        console.log('[UI] Setting transcript:', transcript);
+        transcriptEl.textContent = transcript;
+        transcriptEl.contentEditable = "true";
+        transcriptEl.classList.add('editable');
+        document.getElementById('metricSTT').textContent = formatTime(transcribeData.duration_ms);
+        document.getElementById('sttEngine').textContent = transcribeData.stt_model;
+        engineInfo.style.display = 'flex';
+        
+        setTranscriptStatus('success', 'Ready - Edit if needed');
+        setStatus('success', 'Review transcript below');
+        
+        // Show step 2 controls
+        showControls(2);
+        console.log('[UI] Transcript displayed, waiting for user confirmation');
+        
+        // Hide stop button, show start button
+        stopRecordBtn.classList.add('hidden');
+        startRecordBtn.disabled = false;
+        
+      } catch (err) {
+        clearInterval(countdownInterval);
+        setStatus('error', 'Recording failed');
+        showError('Recording/transcription error: ' + err.message);
+        console.error('[UI] Recording error:', err);
+        resetUI();
+      }
+    }
+
+    // Step 2: Stop Recording & Transcribe
+    async function stopRecording() {
+      stopRecordBtn.disabled = true;
+      setStatus('running', 'Processing...');
+      document.getElementById('step-record').classList.remove('recording');
+      
+      // Clear countdown and auto-stop timer if they're still running
+      if (window.recordingCountdown) {
+        clearInterval(window.recordingCountdown);
+        window.recordingCountdown = null;
+      }
+      if (window.autoStopTimeout) {
+        clearTimeout(window.autoStopTimeout);
+        window.autoStopTimeout = null;
+      }
+      
+      try {
+        // Stop recording
+        console.log('[UI] Stopping recording...');
+        const stopRes = await fetch("http://localhost:7860/record/stop", {
+          method: "POST"
+        });
+        
+        console.log('[UI] Stop response status:', stopRes.status);
+        
+        if (!stopRes.ok) {
+          const errorText = await stopRes.text();
+          console.error('[UI] Stop failed:', errorText);
+          throw new Error('Failed to stop recording: ' + errorText);
+        }
+        const stopData = await stopRes.json();
+        console.log('[UI] Stop data:', stopData);
+        audioPath = stopData.audio_path;
+        
+        if (!audioPath) {
+          throw new Error('No audio file path returned from server');
+        }
+        
+        const recordTime = Date.now() - recordStartTime;
+        document.getElementById('metricRecord').textContent = formatTime(recordTime);
+        
+        // Transcribe
+        setStepActive('step-stt', true);
+        setStatus('running', 'Transcribing...');
+        
+        const stt = document.getElementById('stt').value;
+        console.log('[UI] Transcribing with model:', stt, 'audio path:', audioPath);
+        const transcribeRes = await fetch("http://localhost:7860/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audio_path: audioPath, stt_model: stt })
+        });
+        
+        console.log('[UI] Transcribe response status:', transcribeRes.status);
+        
+        if (!transcribeRes.ok) {
+          const errorText = await transcribeRes.text();
+          console.error('[UI] Transcribe failed:', errorText);
+          throw new Error('Transcription failed: ' + errorText);
+        }
+        const transcribeData = await transcribeRes.json();
+        console.log('[UI] Transcribe data:', transcribeData);
+        
+        // Show transcript
+        const transcript = transcribeData.transcript || '(no speech detected)';
+        console.log('[UI] Setting transcript:', transcript);
+        transcriptEl.textContent = transcript;
+        transcriptEl.contentEditable = "true";
+        transcriptEl.classList.add('editable');
+        document.getElementById('metricSTT').textContent = formatTime(transcribeData.duration_ms);
+        document.getElementById('sttEngine').textContent = transcribeData.stt_model;
+        engineInfo.style.display = 'flex';
+        
+        setTranscriptStatus('success', 'Ready - Edit if needed');
+        setStatus('success', 'Review transcript below');
+        
+        // Show step 2 controls
+        showControls(2);
+        console.log('[UI] Transcript displayed, waiting for user confirmation');
+        
+      } catch (err) {
+        setStatus('error', 'Processing failed');
+        showError('Error during recording/transcription: ' + err.message + '. Check browser console (F12) and server terminal for details.');
+        console.error('[UI] Stop/transcribe error:', err);
+        resetUI();
+      }
+    }
+
+    // Step 3: Send to LLM & TTS
+    async function confirmTranscript() {
+      confirmTranscriptBtn.disabled = true;
+      retryRecordBtn.disabled = true;
+      transcriptEl.contentEditable = "false";
+      transcriptEl.classList.remove('editable');
+      
+      showControls(0);
+      setStatus('running', 'Processing AI...');
+      setStepActive('step-llm', true);
+      
+      try {
+        const userText = transcriptEl.textContent.trim();
+        const llm = document.getElementById('llm').value.trim() || "phi";
+        const prompt = document.getElementById('prompt').value || "Answer briefly.";
+        
+        // Call LLM
+        const llmRes = await fetch("http://localhost:7860/llm/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: userText, model: llm, prompt: prompt })
+        });
+        
+        if (!llmRes.ok) throw new Error('LLM request failed');
+        const llmData = await llmRes.json();
+        
+        replyEl.textContent = llmData.reply;
+        document.getElementById('metricLLM').textContent = formatTime(llmData.duration_ms);
+        document.getElementById('llmEngine').textContent = `${llmData.llm_model} @ ${llmData.ollama_host}`;
+        
+        // TTS
+        setStepActive('step-tts', true);
+        setStatus('running', 'Speaking...');
+        showControls(3);
+        
+        const tts = document.getElementById('tts').value;
+        const rate = Number(document.getElementById('rate').value || 1.0);
+        
+        const ttsRes = await fetch("http://localhost:7860/tts/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: llmData.reply, tts_engine: tts, rate: rate })
+        });
+        
+        if (!ttsRes.ok) throw new Error('TTS failed');
+        const ttsData = await ttsRes.json();
+        
+        document.getElementById('metricTTS').textContent = formatTime(ttsData.duration_ms);
+        document.getElementById('ttsEngine').textContent = ttsData.tts_engine;
+        
+        const totalTime = Date.now() - totalStartTime;
+        document.getElementById('metricTotal').textContent = formatTime(totalTime);
+        
+        setStatus('success', 'Completed ✓');
+        setTranscriptStatus('success', 'Processed');
+        
+        // Clear workflow after 2 seconds
+        setTimeout(() => {
+          clearAllSteps();
+          resetUI();
+        }, 2000);
+        
+      } catch (err) {
+        setStatus('error', 'Error: ' + err.message);
+        console.error(err);
+        resetUI();
+      }
+    }
+
+    // Retry Recording
+    function retryRecording() {
+      transcriptEl.textContent = "Press 'Start Recording' to begin...";
+      transcriptEl.contentEditable = "false";
+      transcriptEl.classList.remove('editable');
+      replyEl.textContent = "Waiting for your question...";
+      setTranscriptStatus('idle', 'Waiting');
+      clearAllSteps();
+      resetUI();
+    }
+
+    // Stop TTS
+    async function stopTTS() {
+      try {
+        await fetch("http://localhost:7860/tts/stop", { method: "POST" });
+        setStatus('idle', 'TTS Stopped');
+        showControls(0);
+        resetUI();
+      } catch (err) {
+        console.error('Failed to stop TTS', err);
+      }
+    }
+
+    function resetUI() {
+      // Clear any active timers
+      if (window.recordingCountdown) {
+        clearInterval(window.recordingCountdown);
+        window.recordingCountdown = null;
+      }
+      if (window.autoStopTimeout) {
+        clearTimeout(window.autoStopTimeout);
+        window.autoStopTimeout = null;
+      }
+      
+      startRecordBtn.disabled = false;
+      stopRecordBtn.classList.add('hidden');
+      confirmTranscriptBtn.disabled = false;
+      retryRecordBtn.disabled = false;
+      showControls(1);
+      setStatus('idle', 'Ready to Record');
+    }
+
+    // Event listeners
+    startRecordBtn.addEventListener('click', startRecording);
+    stopRecordBtn.addEventListener('click', stopRecording);
+    confirmTranscriptBtn.addEventListener('click', confirmTranscript);
+    retryRecordBtn.addEventListener('click', retryRecording);
+    stopTTSBtn.addEventListener('click', stopTTS);
+
+    // Check available engines on load
+    fetch('http://localhost:7860/engines')
+      .then(r => r.json())
+      .then(data => {
+        const ttsSelect = document.getElementById('tts');
+        data.engines.forEach(engine => {
+          const option = Array.from(ttsSelect.options).find(o => o.value === engine.id);
+          if (option && !engine.available) {
+            option.textContent += ' (Not Installed)';
+            option.disabled = true;
+          }
+        });
+      })
+      .catch(() => {
+        console.log('Could not fetch engine info');
+      });
+      
+    // Initialize
+    resetUI();
+  </script>
+</body>
+</html>
