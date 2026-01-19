@@ -45,6 +45,7 @@ CORS(app)
 
 stt_model: Optional[WhisperModel] = None
 coqui_tts = None  # Type: Optional[TTS.api.TTS]
+piper_voice = None  # Type: Optional[piper.voice.PiperVoice]
 recording_active = False
 tts_active = False
 tts_engine_instance = None
@@ -156,28 +157,133 @@ def speak_pyttsx3(text: str, rate_factor: float = 1.0) -> str:
     return "pyttsx3 (Windows SAPI)"
 
 
+def load_piper_voice(model_path: str = None):
+    """Load a Piper voice model. Downloads a default model if none provided."""
+    global piper_voice
+    
+    if piper_voice is not None:
+        return piper_voice
+    
+    if not PIPER_AVAILABLE:
+        return None
+    
+    try:
+        import onnxruntime
+        from pathlib import Path
+        
+        # Default model path - try to use a common voice
+        if model_path is None:
+            # Try to find or download a default voice model
+            # For now, we'll use a simple approach: try to find any .onnx file
+            # or download one from Hugging Face
+            voices_dir = os.path.join(os.path.expanduser("~"), ".piper", "voices")
+            os.makedirs(voices_dir, exist_ok=True)
+            
+            # Try to find an existing model
+            model_path = os.environ.get("PIPER_MODEL_PATH", None)
+            if model_path is None or not os.path.exists(model_path):
+                # Look for any .onnx file in voices directory
+                for file in os.listdir(voices_dir):
+                    if file.endswith('.onnx'):
+                        model_path = os.path.join(voices_dir, file)
+                        break
+            
+            # If still no model, we'll need to download one
+            # For now, return None and fall back to pyttsx3
+            if model_path is None or not os.path.exists(model_path):
+                print("[tts] No Piper voice model found. Please download a voice model.")
+                print("[tts] You can download voices from: https://huggingface.co/rhasspy/piper-voices")
+                return None
+        
+        # Load the model
+        model_json_path = model_path.replace('.onnx', '.onnx.json')
+        if not os.path.exists(model_json_path):
+            print(f"[tts] Model JSON not found: {model_json_path}")
+            return None
+        
+        # Load config
+        with open(model_json_path, 'r', encoding='utf-8') as f:
+            config_dict = json.load(f)
+        
+        config = piper.config.PiperConfig.from_dict(config_dict)
+        
+        # Create ONNX session
+        session = onnxruntime.InferenceSession(model_path)
+        
+        # Create voice
+        piper_voice = piper.voice.PiperVoice(session, config)
+        print(f"[tts] Loaded Piper voice model: {model_path}")
+        return piper_voice
+        
+    except Exception as e:
+        print(f"[tts] Error loading Piper voice: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def speak_piper(text: str, rate_factor: float = 1.0) -> str:
     """Speak text via Piper TTS (neural)."""
+    global piper_voice
+    
     if not PIPER_AVAILABLE:
         print("[tts] Piper not installed, falling back to pyttsx3...")
         return speak_pyttsx3(text, rate_factor)
     
     print("[tts] Speaking with Piper (neural TTS)...")
-    # Use piper CLI if available
+    
     try:
+        # Load voice if not already loaded
+        voice = load_piper_voice()
+        if voice is None:
+            print("[tts] Could not load Piper voice model, falling back to pyttsx3...")
+            return speak_pyttsx3(text, rate_factor)
+        
+        # Synthesize text to audio
+        # First, phonemize the text using EspeakPhonemizer
+        phonemizer = piper.phonemize_espeak.EspeakPhonemizer(
+            voice.config.espeak.voice,
+            voice.config.phoneme_type
+        )
+        phonemes = phonemizer.phonemize(text)
+        phoneme_ids = voice.phonemes_to_ids(phonemes)
+        
+        # Create synthesis config with speed adjustment
+        syn_config = piper.config.SynthesisConfig(
+            length_scale=1.0 / rate_factor if rate_factor > 0 else 1.0,
+            noise_scale=piper.config.DEFAULT_NOISE_SCALE,
+            noise_w_scale=piper.config.DEFAULT_NOISE_W_SCALE
+        )
+        
+        # Generate audio
+        audio_array = voice.phoneme_ids_to_audio(phoneme_ids, syn_config)
+        
+        # Normalize audio to [-1, 1] range (should already be, but ensure)
+        audio_array = np.clip(audio_array, -1.0, 1.0)
+        
+        # Get sample rate from config
+        sample_rate = voice.config.audio.sample_rate
+        
+        # Save to temporary file
         output_path = os.path.join(tempfile.gettempdir(), f"piper_{int(time.time())}.wav")
-        # Try to find piper executable or use piper-tts python package
-        # For simplicity, fall back to pyttsx3 if not configured
-        print("[tts] Piper requires manual setup, falling back to pyttsx3...")
-        return speak_pyttsx3(text, rate_factor)
+        sf.write(output_path, audio_array, sample_rate)
+        
+        # Play the audio
+        sd.play(audio_array, sample_rate)
+        sd.wait()
+        
+        return f"Piper TTS (sample_rate={sample_rate}Hz)"
+        
     except Exception as e:
         print(f"[tts] Piper error: {e}, falling back to pyttsx3...")
+        import traceback
+        traceback.print_exc()
         return speak_pyttsx3(text, rate_factor)
 
 
 def speak_coqui(text: str, rate_factor: float = 1.0) -> str:
     """Speak text via Coqui TTS (neural)."""
-    global coqui_tts
+    global coqui_tts, tts_active
     if not COQUI_AVAILABLE:
         print("[tts] Coqui TTS not installed, falling back to pyttsx3...")
         return speak_pyttsx3(text, rate_factor)
@@ -185,20 +291,71 @@ def speak_coqui(text: str, rate_factor: float = 1.0) -> str:
     print("[tts] Speaking with Coqui TTS (neural)...")
     try:
         if coqui_tts is None:
+            print("[tts] Loading Coqui TTS model...")
             # Use a fast, small model
             coqui_tts = CoquiTTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False)
+            print("[tts] Coqui TTS model loaded")
         
         output_path = os.path.join(tempfile.gettempdir(), f"coqui_{int(time.time())}.wav")
+        print(f"[tts] Generating audio to: {output_path}")
         coqui_tts.tts_to_file(text=text, file_path=output_path)
         
-        # Play the audio
+        # Check if file was created
+        if not os.path.exists(output_path):
+            raise FileNotFoundError(f"Audio file was not created: {output_path}")
+        
+        file_size = os.path.getsize(output_path)
+        print(f"[tts] Audio file created: {file_size} bytes")
+        
+        # Read the audio file
+        print("[tts] Reading audio file...")
         data, samplerate = sf.read(output_path)
-        sd.play(data, samplerate)
-        sd.wait()
+        print(f"[tts] Audio loaded: shape={data.shape}, samplerate={samplerate}Hz")
+        
+        # Ensure audio is in the right format
+        # Coqui might output stereo, but we need to handle mono too
+        if len(data.shape) > 1:
+            # If stereo, convert to mono by averaging channels
+            if data.shape[1] > 1:
+                data = np.mean(data, axis=1)
+                print("[tts] Converted stereo to mono")
+        
+        # Normalize audio to [-1, 1] range if needed
+        if data.dtype != np.float32:
+            data = data.astype(np.float32)
+            # Normalize if it's int16
+            if np.abs(data).max() > 1.0:
+                data = data / np.abs(data).max()
+        
+        # Ensure audio is in valid range
+        data = np.clip(data, -1.0, 1.0)
+        
+        print(f"[tts] Playing audio through speakers (samplerate={samplerate}Hz)...")
+        print(f"[tts] Available audio devices: {sd.query_devices()}")
+        print(f"[tts] Default output device: {sd.default.device}")
+        
+        tts_active = True
+        
+        # Play the audio - explicitly use default output device
+        try:
+            sd.play(data, samplerate, device=sd.default.device[1] if isinstance(sd.default.device, tuple) else sd.default.device)
+            sd.wait()  # Wait until playback is finished
+        except Exception as play_error:
+            print(f"[tts] Error during playback: {play_error}")
+            # Try without specifying device
+            print("[tts] Retrying without device specification...")
+            sd.play(data, samplerate)
+            sd.wait()
+        
+        print("[tts] Audio playback completed")
+        tts_active = False
         
         return "Coqui TTS (Tacotron2-DDC)"
     except Exception as e:
-        print(f"[tts] Coqui error: {e}, falling back to pyttsx3...")
+        print(f"[tts] Coqui error: {e}")
+        import traceback
+        traceback.print_exc()
+        tts_active = False
         return speak_pyttsx3(text, rate_factor)
 
 
